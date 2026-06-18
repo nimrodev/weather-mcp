@@ -115,6 +115,41 @@ function createMcpServer(): McpServer {
     }
   );
 
+  server.registerTool(
+    "get_average_temperature",
+    {
+      description: "Get the average temperature for a location in Israel over a date range. Returns the mean of daily averages ((max+min)/2) across all days in the range. Useful for comparing periods or summarising seasonal data.",
+      inputSchema: {
+        location: z
+          .string()
+          .describe(
+            "City or area in Israel, e.g. Tel Aviv, Jerusalem, Haifa, Eilat, Dead Sea, Tiberias, Nazareth, Beer Sheva"
+          ),
+        date_from: z.string().describe("Start date in YYYY-MM-DD format"),
+        date_to: z.string().describe("End date in YYYY-MM-DD format"),
+      },
+    },
+    async ({ location, date_from, date_to }) => {
+      const { lat, lon, name } = await geocode(location);
+      const daily = await fetchTemps(lat, lon, date_from, date_to);
+      const count = daily.time.length;
+      if (count === 0) throw new Error(`No temperature data for ${name} between ${date_from} and ${date_to}.`);
+      const sum = daily.time.reduce(
+        (acc, _, i) => acc + (daily.temperature_2m_max[i] + daily.temperature_2m_min[i]) / 2,
+        0
+      );
+      const avg = (sum / count).toFixed(1);
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `${name} average temperature (${date_from} → ${date_to}): ${avg}°C (mean of ${count} day${count === 1 ? "" : "s"})`,
+          },
+        ],
+      };
+    }
+  );
+
   // ─── RESOURCE ────────────────────────────────────────────────────────────────
   //
   // A Resource is a URI-addressable, read-only data snapshot that the client can
