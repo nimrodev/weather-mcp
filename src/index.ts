@@ -32,7 +32,7 @@ async function fetchTemps(lat: number, lon: number, dateFrom: string, dateTo: st
   const today = new Date().toISOString().split("T")[0];
   // Use archive API for fully historical ranges, forecast API otherwise
   const base =
-    dateTo < today
+    dateTo <= today
       ? "https://archive-api.open-meteo.com/v1/archive"
       : "https://api.open-meteo.com/v1/forecast";
 
@@ -109,6 +109,43 @@ function createMcpServer(): McpServer {
           {
             type: "text" as const,
             text: `${name} temperatures (${date_from} → ${date_to}):\n${rows.join("\n")}`,
+          },
+        ],
+      };
+    }
+  );
+
+  server.registerTool(
+    "get_average_temperature",
+    {
+      description: "Get the average temperature for a location in Israel over a date range. Returns the mean of daily averages ((max+min)/2) across all days in the range. Useful for comparing periods or summarising seasonal data.",
+      inputSchema: {
+        location: z
+          .string()
+          .describe(
+            "City or area in Israel, e.g. Tel Aviv, Jerusalem, Haifa, Eilat, Dead Sea, Tiberias, Nazareth, Beer Sheva"
+          ),
+        date_from: z.string().describe("Start date in YYYY-MM-DD format"),
+        date_to: z.string().describe("End date in YYYY-MM-DD format"),
+      },
+    },
+    async ({ location, date_from, date_to }) => {
+      if (date_from > date_to) throw new Error(`date_from (${date_from}) must be on or before date_to (${date_to}).`);
+      const { lat, lon, name } = await geocode(location);
+      const daily = await fetchTemps(lat, lon, date_from, date_to);
+      const count = daily.temperature_2m_max.length;
+      if (count === 0) throw new Error(`No temperature data for ${name} between ${date_from} and ${date_to}.`);
+      const sum = daily.temperature_2m_max.reduce((acc, max, i) => {
+        const min = daily.temperature_2m_min[i];
+        if (max == null || min == null) throw new Error(`Missing temperature data for ${name} on ${daily.time[i]}.`);
+        return acc + (max + min) / 2;
+      }, 0);
+      const avg = (sum / count).toFixed(1);
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `${name} average temperature (${date_from} → ${date_to}): ${avg}°C (mean of ${count} day${count === 1 ? "" : "s"})`,
           },
         ],
       };
