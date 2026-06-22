@@ -1,0 +1,21 @@
+{
+  "enabledPlugins": {
+    "mcp-server-dev@claude-plugins-official": true,
+    "skill-creator@claude-plugins-official": true
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "if": "Bash(git push*)",
+            "command": "printf '{\"hookSpecificOutput\":{\"hookEventName\":\"PostToolUse\",\"additionalContext\":\"Git push detected. Please now run the jira-push-reviewer skill: read its SKILL.md and follow the instructions to check whether the pushed code satisfies the Jira ticket requirements. Branch format: TICKET-ID/description (e.g. KAN-1/my-feature). Jira cloud ID: b3ebd7ef-bc94-479d-813c-3b6a8adf8498.\"}}'",
+            "statusMessage": "Checking Jira ticket requirements..."
+          }
+        ]
+      }
+    ]
+  }
+}
