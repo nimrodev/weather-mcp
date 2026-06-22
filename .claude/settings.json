@@ -10,7 +10,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -c \"\nimport sys, json\ndata = json.load(sys.stdin)\ncmd = data.get('tool_input', {}).get('command', '')\nif 'git push' in cmd:\n    print(json.dumps({'hookSpecificOutput': {'hookEventName': 'PostToolUse', 'additionalContext': 'Git push detected. Please now run the jira-push-reviewer skill: read its SKILL.md and follow the instructions to check whether the pushed code satisfies the Jira ticket requirements. Branch format: TICKET-ID/description (e.g. KAN-1/my-feature). Jira cloud ID: b3ebd7ef-bc94-479d-813c-3b6a8adf8498.'}}))\n\"",
+            "command": "python3 -c \"\nimport sys, json, re\ndata = json.load(sys.stdin)\ncmd = data.get('tool_input', {}).get('command', '')\nparts = re.split(r'&&|;|\\|', cmd)\nif any(re.match(r'\\s*git(?:\\s+-C\\s+\\S+)?\\s+push\\b', p) for p in parts):\n    print(json.dumps({'hookSpecificOutput': {'hookEventName': 'PostToolUse', 'additionalContext': 'Git push detected. Please now run the jira-push-reviewer skill: read its SKILL.md and follow the instructions to check whether the pushed code satisfies the Jira ticket requirements. Branch format: TICKET-ID/description (e.g. KAN-1/my-feature). Jira cloud ID: b3ebd7ef-bc94-479d-813c-3b6a8adf8498.'}}))\n\"",
             "statusMessage": "Checking Jira ticket requirements..."
           }
         ]
