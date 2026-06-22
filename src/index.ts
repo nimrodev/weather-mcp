@@ -152,6 +152,52 @@ function createMcpServer(): McpServer {
     }
   );
 
+  server.registerTool(
+    "get_extreme_day",
+    {
+      description: "Find the hottest or coldest day for a location in Israel within a date range. Returns the date, max, and min temperature for that day.",
+      inputSchema: {
+        location: z
+          .string()
+          .describe(
+            "City or area in Israel, e.g. Tel Aviv, Jerusalem, Haifa, Eilat, Dead Sea, Tiberias, Nazareth, Beer Sheva"
+          ),
+        date_from: z.string().describe("Start date in YYYY-MM-DD format"),
+        date_to: z.string().describe("End date in YYYY-MM-DD format"),
+        extreme: z.enum(["hottest", "coldest"]).describe("Whether to find the hottest or coldest day"),
+      },
+    },
+    async ({ location, date_from, date_to, extreme }) => {
+      if (date_from > date_to) throw new Error(`date_from (${date_from}) must be on or before date_to (${date_to}).`);
+      const { lat, lon, name } = await geocode(location);
+      const daily = await fetchTemps(lat, lon, date_from, date_to);
+      const count = daily.time.length;
+      if (count === 0) throw new Error(`No temperature data for ${name} between ${date_from} and ${date_to}.`);
+
+      let bestIdx = 0;
+      for (let i = 0; i < count; i++) {
+        const max = daily.temperature_2m_max[i];
+        const min = daily.temperature_2m_min[i];
+        if (max == null || min == null) throw new Error(`Missing temperature data for ${name} on ${daily.time[i]}.`);
+        if (extreme === "hottest" ? max > daily.temperature_2m_max[bestIdx] : min < daily.temperature_2m_min[bestIdx]) {
+          bestIdx = i;
+        }
+      }
+
+      const date = daily.time[bestIdx];
+      const max = daily.temperature_2m_max[bestIdx];
+      const min = daily.temperature_2m_min[bestIdx];
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `${name} ${extreme} day (${date_from} → ${date_to}): ${date} — max ${max}°C, min ${min}°C`,
+          },
+        ],
+      };
+    }
+  );
+
   // ─── RESOURCE ────────────────────────────────────────────────────────────────
   //
   // A Resource is a URI-addressable, read-only data snapshot that the client can
