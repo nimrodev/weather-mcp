@@ -198,6 +198,60 @@ function createMcpServer(): McpServer {
     }
   );
 
+  server.registerTool(
+    "get_weather_stats",
+    {
+      description: "Get a full statistical summary for a location in Israel over a date range: hottest day, coldest day, average temperature, and average daily temperature range — all in a single API call.",
+      inputSchema: {
+        location: z
+          .string()
+          .describe(
+            "City or area in Israel, e.g. Tel Aviv, Jerusalem, Haifa, Eilat, Dead Sea, Tiberias, Nazareth, Beer Sheva"
+          ),
+        date_from: z.string().describe("Start date in YYYY-MM-DD format"),
+        date_to: z.string().describe("End date in YYYY-MM-DD format"),
+      },
+    },
+    async ({ location, date_from, date_to }) => {
+      if (date_from > date_to) throw new Error(`date_from (${date_from}) must be on or before date_to (${date_to}).`);
+      const { lat, lon, name } = await geocode(location);
+      const daily = await fetchTemps(lat, lon, date_from, date_to);
+      const count = daily.time.length;
+      if (count === 0) throw new Error(`No temperature data for ${name} between ${date_from} and ${date_to}.`);
+
+      let hotIdx = 0, coldIdx = 0, sumAvg = 0, sumRange = 0;
+      for (let i = 0; i < count; i++) {
+        const max = daily.temperature_2m_max[i];
+        const min = daily.temperature_2m_min[i];
+        if (max == null || min == null) throw new Error(`Missing temperature data for ${name} on ${daily.time[i]}.`);
+        if (max > daily.temperature_2m_max[hotIdx]) hotIdx = i;
+        if (min < daily.temperature_2m_min[coldIdx]) coldIdx = i;
+        sumAvg += (max + min) / 2;
+        sumRange += max - min;
+      }
+
+      const avgTemp = (sumAvg / count).toFixed(1);
+      const avgRange = (sumRange / count).toFixed(1);
+      const hot = daily.time[hotIdx];
+      const cold = daily.time[coldIdx];
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: [
+              `${name} weather stats (${date_from} → ${date_to}):`,
+              `Hottest day:  ${hot} — max ${daily.temperature_2m_max[hotIdx]}°C, min ${daily.temperature_2m_min[hotIdx]}°C`,
+              `Coldest day:  ${cold} — max ${daily.temperature_2m_max[coldIdx]}°C, min ${daily.temperature_2m_min[coldIdx]}°C`,
+              `Average temperature:       ${avgTemp}°C`,
+              `Average daily range (max−min): ${avgRange}°C`,
+            ].join("\n"),
+          },
+        ],
+      };
+    }
+  );
+
   // ─── RESOURCE ────────────────────────────────────────────────────────────────
   //
   // A Resource is a URI-addressable, read-only data snapshot that the client can
