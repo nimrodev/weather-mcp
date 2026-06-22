@@ -18,4 +18,6 @@ Using the Atlassian MCP tools:
 
 9. If the verdict is **PASS**, transition the Jira ticket to "In Review" using transitionJiraIssue (transition ID `31`). If the verdict is **NEEDS ATTENTION** or **FAIL**, leave the ticket in "In Progress" and report the gaps to the user.
 
-10. Report what was done with a link to the Jira issue.
+10. Open a pull request using the GitHub CLI: `gh pr create --title "KAN-X: <ticket summary>" --body "Closes KAN-X\n\n<brief description of what was implemented>"`. The PR title should match the ticket summary.
+
+11. Report what was done with links to both the Jira issue and the GitHub PR.
